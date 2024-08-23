@@ -6,7 +6,8 @@ export default {
 
   // Target: https://go.nuxtjs.dev/config-target
   target: 'static',
-
+  router: {
+    base:  '/mini_poon/'    },
   // Global page headers: https://go.nuxtjs.dev/config-head
   head: {
     titleTemplate: '%s - mini_poon',
