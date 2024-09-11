@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ใบเสนอราคา/ใบส่งของ</title>
+
+    <!-- Vue.js -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
+
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        width: 210mm; /* ความกว้างเท่ากับกระดาษ A4 */
+        height: 297mm; /* ความสูงเท่ากับกระดาษ A4 */
+        margin: 20px auto;
+        padding: 20px;
+        box-sizing: border-box; /* รวม padding ไว้ในขนาดของ element */
+        border: 1px solid #000; /* เส้นกรอบรอบนอก */
+      }
+
+      @media print {
+        .container {
+          margin: 0;
+          border: none; /* ลบกรอบออกเมื่อพิมพ์ */
+        }
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+
+      .header-left h1 {
+        font-size: 22px;
+        color: #0066cc;
+        margin: 0;
+      }
+
+      .header-left p {
+        margin: 4px 0;
+      }
+
+      .header-right {
+        background-color: #ccc;
+        padding: 10px;
+        text-align: center;
+      }
+
+      .header-right h2 {
+        margin: 0;
+      }
+
+      .customer-details,
+      .items,
+      .totals {
+        width: 100%;
+        margin-bottom: 20px;
+      }
+
+      .customer-details td,
+      .items td,
+      .items th,
+      .totals td {
+        padding: 8px;
+        border: 1px solid #000;
+      }
+
+      .items {
+        border-collapse: collapse;
+      }
+
+      .items th {
+        background-color: #f0f0f0;
+        text-align: center;
+      }
+
+      .totals td {
+        text-align: right;
+      }
+
+      .signatures {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 30px;
+      }
+
+      .signatures div {
+        width: 45%;
+        text-align: center;
+      }
+
+      .signature-box {
+        margin-top: 50px;
+        border-top: 1px solid #000;
+      }
+
+      .text-right {
+        text-align: right;
+      }
+
+      .text-left {
+        text-align: left;
+      }
+
+      table.customer-details {
+        border: 1px solid black; /* กำหนดกรอบรอบนอกของตาราง */
+        border-collapse: collapse; /* ทำให้กรอบรวมกัน */
+      }
+
+      table.customer-details td {
+        border: none; /* ไม่มีกรอบระหว่างแถว */
+        padding: 8px; /* เพิ่มช่องว่างภายในเซลล์ */
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="container">
+        <div class="header">
+          <div class="header-left">
+            <h1>บริษัท ปุญญ จำกัด<br /><small>Poonya CO.,LTD</small></h1>
+            <p>
+              90/368 ซอยท่าอิฐ ตำบลท่าอิฐ อำเภอปากเกร็ด จังหวัดนนทบุรี 11120
+            </p>
+            <p>Tel: 094-772-6352 <br />Tax Id: 0125567009339</p>
+          </div>
+          <div class="header-right">
+            <h2>{{ invoiceType?.nameEng }}<br /> {{ invoiceType?.nameThai}}</h2>
+            <p>เลขที่ {{invoiceType?.numName }} No.: {{ invoiceData?.invoiceNumber }}</p>
+            <p>วันที่ Date: {{ invoiceData?.date }}</p>
+          </div>
+        </div>
+
+        <table class="customer-details">
+          <tr>
+            <td>
+              <strong>ชื่อลูกค้า:</strong> {{ invoiceData?.customer.name }}
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>เลขประจำตัวผู้เสียภาษี:</strong> {{
+              invoiceData?.customer.taxId }}
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>เบอร์โทรศัพท์:</strong> {{ invoiceData?.customer.phone }}
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>ที่อยู่:</strong> {{ invoiceData?.customer.address }}
+            </td>
+          </tr>
+        </table>
+
+        <div style="display: flex; justify-content: space-between">
+          <span>ยืนราคา: {{ invoiceData?.validity }} วัน</span>
+          <span>จำนวนวันเครดิต: {{ invoiceData?.creditDays }} วัน</span>
+        </div>
+
+        <table class="items">
+          <thead>
+            <tr>
+              <th>ลำดับ</th>
+              <th>รายการ</th>
+              <th>จำนวน</th>
+              <th>ราคา/หน่วย</th>
+              <th>ราคารวม</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, index) in invoiceData?.items" :key="index">
+              <td>{{ index + 1 }}</td>
+              <td>{{ item.description }}</td>
+              <td class="text-right">{{ item.quantity }}</td>
+              <td class="text-right">{{ item.unitPrice }}</td>
+              <td class="text-right">{{ item.totalPrice }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>หมายเหตุ: {{ invoiceData?.notes }}</p>
+
+        <table class="totals">
+          <tr>
+            <td><strong>ราคารวม:</strong></td>
+            <td>{{ invoiceData?.totalBeforeDiscount }}</td> <!-- จาก totalBeforeDiscount -->
+          </tr>
+          <tr>
+            <td><strong>ส่วนลดการค้า:</strong></td>
+            <td>{{ invoiceData?.discount }}%</td> <!-- จาก discount -->
+          </tr>
+          <tr>
+            <td><strong>เงินหลังหักส่วนลด:</strong></td>
+            <td>{{ invoiceData?.totalAfterDiscount }}</td> <!-- จาก totalAfterDiscount -->
+          </tr>
+          <tr>
+            <td><strong>ภาษีมูลค่าเพิ่ม 7%:</strong></td>
+            <td>{{ invoiceData?.vat }}</td> <!-- จาก vat -->
+          </tr>
+          <tr>
+            <td><strong>รวมทั้งหมด:</strong></td>
+            <td>{{ invoiceData?.grandTotal }}</td> <!-- จาก grandTotal -->
+          </tr>
+        </table>
+
+        
+      </div>
+    </div>
+    <script type="module">
+      import { getInvoiceById } from "./firebase.js";
+
+      new Vue({
+        el: "#app",
+        data: {
+          DocType: [
+            {
+              id: 1,
+              nameThai: "ใบส่งของ",
+              nameEng: "Delivery Note",
+              shortname: "dv",
+              numName: "Delivery"
+            },
+            {
+              id: 2,
+              nameThai: "ใบเสนอราคา",
+              nameEng: "Quotation",
+              shortname: "qt",
+               numName: "Quotation"
+            },
+            {
+              id: 3,
+              nameThai: "ใบวางบิล",
+              nameEng: "Billing Note",
+              shortname: "bi",
+               numName: "Billing"
+            },
+          ],
+          invoiceData: null,
+          invoiceid: null,
+          invoiceType: null
+        },
+        methods: {
+          getInvoice() {
+            getInvoiceById(this.invoiceid.type, this.invoiceid.id, (data) => {
+              if (data) {
+                console.log("Fetched Invoice Data:", data);
+                this.invoiceData = data; 
+                this.invoiceType = this.DocType.find((data) => data.nameEng === this.invoiceid.type)
+                console.log(this.invoiceType)
+              } else {
+                console.log("No data found for this invoice.");
+              }
+            });
+          },
+        },
+        mounted() {
+          this.getInvoice();
+        },
+        created() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const encodedData = urlParams.get("data");
+
+          if (encodedData) {
+            try {
+              const decodedData = decodeURIComponent(encodedData);
+              this.invoiceid = JSON.parse(decodedData);
+            } catch (error) {
+              console.error("Error decoding data:", error);
+            }
+          }
+        },
+      });
+    </script>
+  </body>
+</html>

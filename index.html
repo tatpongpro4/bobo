@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>สร้างใบเสนอราคา/ใบส่งของ</title>
+    <!-- Vuetify CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <v-app>
+        <v-container>
+          <!-- Tab Menu -->
+          <v-tabs v-model="activeTab">
+            <v-tab href="#tab-1">สร้างใบเสนอราคา / ใบส่งของ</v-tab>
+            <v-tab href="#tab-2">เพิ่มข้อมูลลูกค้า</v-tab>
+          </v-tabs>
+
+          <!-- Tab Content -->
+          <v-tabs-items v-model="activeTab">
+            <!-- Tab 1: สร้างใบเสนอราคา / ใบส่งของ -->
+            <v-tab-item value="tab-1">
+              <v-form>
+                <!-- Dropdown for document type -->
+                <v-select
+                  :items="DocType"
+                  item-text="nameThai"
+                  item-value="id"
+                  label="เลือกประเภทเอกสาร"
+                  v-model="selectedDocId"
+                  @change="populateDoc"
+                ></v-select>
+
+                <!-- Dropdown for customers -->
+                <v-select
+                  :items="customers"
+                  item-text="name"
+                  item-value="id"
+                  label="เลือกชื่อลูกค้า"
+                  v-model="selectedCustomerId"
+                  @change="populateCustomerDetails"
+                ></v-select>
+
+                <!-- Additional Inputs after customer selection -->
+                <v-row v-if="selectedCustomerId">
+                  <v-col cols="12">
+                    <v-text-field
+                      v-model="selectedCustomer.name"
+                      label="ชื่อบริษัท"
+                      disabled
+                    ></v-text-field>
+                  </v-col>
+
+                  <!-- Date Picker -->
+                  <v-col cols="12">
+                    <v-checkbox
+                      v-model="useToday"
+                      label="ใช้วันที่วันนี้"
+                      @change="setCurrentDate"
+                    ></v-checkbox>
+
+                    <v-menu
+                      v-model="dateMenu"
+                      :close-on-content-click="false"
+                      transition="scale-transition"
+                      offset-y
+                      min-width="290px"
+                    >
+                      <template v-slot:activator="{ on, attrs }">
+                        <v-text-field
+                          v-model="invoiceDate"
+                          label="วันที่"
+                          readonly
+                          v-bind="attrs"
+                          v-on="on"
+                          :disabled="useToday"
+                        ></v-text-field>
+                      </template>
+                      <v-date-picker
+                        v-model="invoiceDate"
+                        @input="dateMenu = false"
+                        :disabled="useToday"
+                        full-width
+                      ></v-date-picker>
+                    </v-menu>
+                  </v-col>
+
+                  <!-- Items List -->
+                  <v-col cols="12">
+                    <h3>รายการสินค้า</h3>
+                    <v-row v-for="(item, index) in items" :key="index">
+                      <v-col cols="4">
+                        <v-text-field
+                          v-model="item.description"
+                          label="รายการ"
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="2">
+                        <v-text-field
+                          v-model.number="item.quantity"
+                          label="จำนวน"
+                          @input="calculateTotal(index)"
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="3">
+                        <v-text-field
+                          v-model.number="item.unitPrice"
+                          label="ราคาต่อหน่วย"
+                          @input="calculateTotal(index)"
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="2">
+                        <v-text-field
+                          v-model="item.totalPrice"
+                          label="ราคารวม"
+                          disabled
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="1">
+                        <v-btn icon @click="removeItem(index)">
+                          <v-icon>mdi-delete</v-icon>
+                        </v-btn>
+                      </v-col>
+                    </v-row>
+                    <v-btn color="primary" @click="addItem">เพิ่มรายการ</v-btn>
+                  </v-col>
+
+                  <!-- Discount and credit days -->
+                  <v-col cols="12">
+                    <v-text-field
+                      v-model.number="discount"
+                      label="ส่วนลด (บาท)"
+                    ></v-text-field>
+                    <v-text-field
+                      v-model.number="creditDays"
+                      label="จำนวนวันเครดิต"
+                      :value="creditDays"
+                    ></v-text-field>
+                    <v-text-field
+                      v-model.number="validity"
+                      label="ยืนราคา"
+                      :value="validity"
+                    ></v-text-field>
+                  </v-col>
+                  
+                  <v-container class="pa-4">
+                    <v-row>
+                      <v-col>
+                        <h3>สรุปยอดรวมใบแจ้งหนี้</h3>
+                      </v-col>
+                    </v-row>
+                    <v-row>
+                      <v-col>
+                        <v-simple-table>
+                          <template v-slot:default>
+                            <thead>
+                              <tr>
+                                <th class="text-left">รายละเอียด</th>
+                                <th class="text-right">มูลค่า</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td><strong>ราคารวม:</strong></td>
+                                <td class="text-right">{{ totalBeforeDiscount.toFixed(2) }} บาท</td>
+                              </tr>
+                              
+                              <tr>
+                                <td><strong>เงินหลังหักส่วนลด:</strong></td>
+                                <td class="text-right">{{ totalAfterDiscount.toFixed(2) }} บาท</td>
+                              </tr>
+                              <tr>
+                                <td><strong>ภาษีมูลค่าเพิ่ม 7%:</strong></td>
+                                <td class="text-right">{{ vat }} บาท</td>
+                              </tr>
+                              <tr>
+                                <td><strong>รวมทั้งหมด:</strong></td>
+                                <td class="text-right">{{ grandTotal }} บาท</td>
+                              </tr>
+                            </tbody>
+                          </template>
+                        </v-simple-table>
+                      </v-col>
+                    </v-row>
+                  </v-container>
+
+                  <!-- Notes -->
+                  <v-col cols="12">
+                    <v-textarea v-model="notes" label="หมายเหตุ"></v-textarea>
+                  </v-col>
+
+                  <!-- Save Button -->
+                  <v-col cols="12">
+                    <v-btn color="success" @click="saveInvoice">
+                      บันทึกใบเสนอราคา/ใบส่งของ
+                    </v-btn>
+                  </v-col>
+
+                  <!-- Print Button (Only show after save) -->
+                  <v-col cols="12" v-if="invoiceSaved">
+                    <v-btn color="info" @click="printInvoice">
+                      พิมพ์ใบเสนอราคา/ใบส่งของ
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-form>
+            </v-tab-item>
+
+            <!-- Tab 2: เพิ่มข้อมูลลูกค้า -->
+            <v-tab-item value="tab-2">
+              <v-form>
+                <h2>เพิ่มข้อมูลลูกค้า</h2>
+                <v-row>
+                  <v-col cols="12">
+                    <v-text-field
+                      v-model="newCustomer.name"
+                      label="ชื่อบริษัท"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12">
+                    <v-text-field
+                      v-model="newCustomer.taxId"
+                      label="เลขประจำตัวผู้เสียภาษี"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12">
+                    <v-text-field
+                      v-model="newCustomer.phone"
+                      label="เบอร์โทรศัพท์"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12">
+                    <v-textarea
+                      v-model="newCustomer.address"
+                      label="ที่อยู่"
+                    ></v-textarea>
+                  </v-col>
+                </v-row>
+                <v-btn color="primary" @click="addCustomer">
+                  เพิ่มข้อมูลลูกค้า
+                </v-btn>
+              </v-form>
+            </v-tab-item>
+          </v-tabs-items>
+        </v-container>
+      </v-app>
+    </div>
+
+    <!-- Vue.js -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <!-- Vuetify JS -->
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.js"></script>
+
+    <!-- Firebase module -->
+    <script type="module">
+      import {
+        addCustomerToFirebase,
+        getCustomerData,
+        saveInvoiceToFirebase,
+      } from "./firebase.js";
+
+      new Vue({
+        el: "#app",
+        vuetify: new Vuetify(),
+        data: {
+          activeTab: "tab-1",
+          selectedDoc: null,
+          selectedDocId: null,
+          selectedCustomerId: null,
+          selectedCustomer: null,
+          customers: [],
+          newCustomer: { name: "", taxId: "", phone: "", address: "" },
+          DocType: [
+            {
+              id: 1,
+              nameThai: "ใบส่งของ",
+              nameEng: "Delivery Note",
+              shortname: "dv",
+            },
+            {
+              id: 2,
+              nameThai: "ใบเสนอราคา",
+              nameEng: "Quotation",
+              shortname: "qt",
+            },
+            {
+              id: 3,
+              nameThai: "ใบวางบิล",
+              nameEng: "Billing Note",
+              shortname: "bi",
+            },
+          ],
+          useToday: false,
+          dateMenu: false,
+          invoiceDate: "",
+          items: [
+            { description: "", quantity: 0, unitPrice: 0, totalPrice: 0 },
+          ],
+          discount: 0,
+          vatRate: 0.07,
+          creditDays: 90,
+          validity: 30,
+          notes: "",
+          invoiceSaved: false,
+        },
+        computed: {
+          totalBeforeDiscount() {
+            // คำนวณราคารวมก่อนหักส่วนลด
+            return this.items.reduce((total, item) => {
+              return total + (item.totalPrice || 0);
+            }, 0);
+          },
+          totalAfterDiscount() {
+            // คำนวณเงินหลังหักส่วนลด
+            return this.totalBeforeDiscount - this.discount;
+          },
+          vat() {
+            // คำนวณภาษีมูลค่าเพิ่ม 7% และให้แสดงทศนิยม 2 ตำแหน่ง
+            return (this.totalAfterDiscount * this.vatRate).toFixed(2);
+          },
+          grandTotal() {
+            // คำนวณรวมทั้งหมดหลังบวกภาษีมูลค่าเพิ่ม
+            return (
+              parseFloat(this.totalAfterDiscount) + parseFloat(this.vat)
+            ).toFixed(2);
+          },
+        },
+        methods: {
+          addCustomer() {
+            addCustomerToFirebase(this.newCustomer)
+              .then(() => {
+                this.newCustomer = {
+                  name: "",
+                  taxId: "",
+                  phone: "",
+                  address: "",
+                };
+                alert("เพิ่มข้อมูลลูกค้าเรียบร้อย");
+              })
+              .catch((error) => {
+                console.error("Error adding customer: ", error);
+                alert("เกิดข้อผิดพลาดในการเพิ่มข้อมูลลูกค้า");
+              });
+          },
+          getCustomer() {
+            getCustomerData((data) => {
+              this.customers = data
+                ? Object.entries(data).map(([id, customer]) => ({
+                    id,
+                    ...customer,
+                  }))
+                : [];
+            });
+          },
+          populateCustomerDetails() {
+            const customer = this.customers.find(
+              (cust) => cust.id === this.selectedCustomerId
+            );
+            this.selectedCustomer = customer ? { ...customer } : null;
+          },
+          populateDoc() {
+            console.log(this.selectedDoc);
+            const doc = this.DocType.find(
+              (doc) => doc.id === this.selectedDocId
+            );
+            this.selectedDoc = doc ? { ...doc } : null;
+          },
+          setCurrentDate() {
+            if (this.useToday) {
+              this.invoiceDate = new Date().toISOString().substr(0, 10); // YYYY-MM-DD format
+            }
+          },
+          addItem() {
+            this.items.push({
+              description: "",
+              quantity: 0,
+              unitPrice: 0,
+              totalPrice: 0,
+            });
+          },
+          removeItem(index) {
+            this.items.splice(index, 1);
+          },
+          calculateTotal(index) {
+            const item = this.items[index];
+            item.totalPrice = item.quantity * item.unitPrice;
+          },
+
+          calculateInvoiceTotals() {
+            // คำนวณราคารวมทั้งหมด (ไม่รวมส่วนลด)
+            this.totalBeforeDiscount = this.items.reduce((total, item) => {
+              return total + (item.totalPrice || 0);
+            }, 0);
+
+            // ใช้ส่วนลดแบบจำนวนเงิน (บาท)
+            const discountAmount = this.discount;
+
+            // คำนวณเงินหลังหักส่วนลด
+            this.totalAfterDiscount = this.totalBeforeDiscount - discountAmount;
+
+            // คำนวณภาษีมูลค่าเพิ่ม 7% และเก็บทศนิยม 2 ตำแหน่ง
+            this.vat = (this.totalAfterDiscount * this.vatRate).toFixed(2);
+
+            // รวมทั้งหมดหลังบวกภาษีมูลค่าเพิ่ม
+            this.grandTotal = (
+              parseFloat(this.totalAfterDiscount) + parseFloat(this.vat)
+            ).toFixed(2);
+          },
+
+          saveInvoice() {
+            // เรียกใช้ฟังก์ชันคำนวณก่อนบันทึก
+            this.calculateInvoiceTotals();
+
+            const invoiceData = {
+              documentType: this.selectedDoc,
+              customer: this.selectedCustomer,
+              date: this.invoiceDate,
+              items: this.items,
+              discount: this.discount, // ใช้ค่าที่ใส่ใน input สำหรับส่วนลด
+              totalBeforeDiscount: this.totalBeforeDiscount.toFixed(2), // ราคารวมก่อนส่วนลดจาก computed
+              totalAfterDiscount: this.totalAfterDiscount.toFixed(2), // เงินหลังหักส่วนลดจาก computed
+              vat: this.vat, // ภาษีมูลค่าเพิ่มจาก computed
+              grandTotal: this.grandTotal, // รวมทั้งหมดจาก computed
+              creditDays: this.creditDays,
+              validity: this.validity,
+              notes: this.notes,
+            };
+
+            saveInvoiceToFirebase(invoiceData, this.selectedDoc.nameEng)
+              .then((data) => {
+                this.invoiceSaved = data;
+                console.log("Invoice saved successfully with ID:", data);
+              })
+              .catch((error) => {
+                console.error("Error saving invoice:", error);
+              });
+          },
+
+          printInvoice() {
+            if (!this.invoiceSaved) {
+              console.error(
+                "No invoice ID found. Please save the invoice first."
+              );
+              return;
+            }
+
+            const invoiceData = {
+              id: this.invoiceSaved,
+              type: this.selectedDoc.nameEng,
+            };
+
+            const invoiceDataEncoded = encodeURIComponent(
+              JSON.stringify(invoiceData)
+            );
+            window.open(`invoice.html?data=${invoiceDataEncoded}`, "_blank");
+          },
+        },
+        mounted() {
+          this.getCustomer();
+        },
+      });
+    </script>
+  </body>
+</html>
