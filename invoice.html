@@ -181,7 +181,7 @@
 
         <div style="display: flex; justify-content: space-between">
           <span>ยืนราคา: {{ invoiceData?.validity }} วัน</span>
-          <span>จำนวนวันเครดิต: {{ invoiceData?.creditDays }} วัน</span>
+          <span>จำนวนวันเครดิต: {{ formatCurrency(invoiceData?.creditDays) }} วัน</span>
         </div>
 
         <table class="items">
@@ -199,7 +199,7 @@
               <td>{{ index + 1 }}</td>
               <td>{{ item.description }}</td>
               <td class="text-right">{{ item.quantity }}</td>
-              <td class="text-right">{{ item.unitPrice }}</td>
+              <td class="text-right">{{ formatCurrency(item.unitPrice) }}</td>
               <td class="text-right">{{ formatCurrency(item.totalPrice) }}</td>
             </tr>
           </tbody>
