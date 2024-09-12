@@ -6,7 +6,7 @@ import {
   set,
   onValue,
   get,
-  runTransaction ,
+  runTransaction,
 } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js";
 
 // Firebase configuration
@@ -49,54 +49,91 @@ export function getCustomerData(callback) {
   );
 }
 
+export function getInvoiceData(callback) {
+  onValue(
+    inVoiceRef,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const allInvoices = [];
+
+        // Loop through each document type (e.g., 'Billing Note', 'Delivery Note')
+        for (let docType in data) {
+          const invoiceList = data[docType].invoiceList;
+
+          // Loop through each invoice in the invoiceList
+          for (let invoiceId in invoiceList) {
+            allInvoices.push({
+              id: invoiceId,
+              ...invoiceList[invoiceId],
+              documentType: docType, // Add the document type to each invoice
+            });
+          }
+        }
+
+        // Return the merged invoices back through the callback
+        callback(allInvoices);
+      } else {
+        console.log("No data available");
+        callback(null);
+      }
+    },
+    (error) => {
+      console.error("Error fetching data:", error);
+      callback(null);
+    }
+  );
+}
 
 // Function to generate the invoice number
 function generateInvoiceNumber(shortname, runNumber) {
   const currentDate = new Date();
-  const year = currentDate.getFullYear();  // ปี ค.ศ.
-  const month = String(currentDate.getMonth() + 1).padStart(2, '0');  // เดือน 2 หลัก
-  const paddedRunNumber = String(runNumber).padStart(4, '0');  // ลำดับ 4 หลัก
+  const year = currentDate.getFullYear(); // ปี ค.ศ.
+  const month = String(currentDate.getMonth() + 1).padStart(2, "0"); // เดือน 2 หลัก
+  const paddedRunNumber = String(runNumber).padStart(4, "0"); // ลำดับ 4 หลัก
 
   // สร้างหมายเลขใบแจ้งหนี้: shortname + "0" + ปี + เดือน + ลำดับ
   return `${shortname}0${year}${month}${paddedRunNumber}`;
 }
 
-
 export function saveInvoiceToFirebase(invoiceData, invoiceType) {
   const db = getDatabase();
-  const invoiceTypeRef = ref(db, `invoices/${invoiceType}/runNumbers/${new Date().getFullYear()}`);
-
+  const invoiceTypeRef = ref(
+    db,
+    `invoices/${invoiceType}/runNumbers/${new Date().getFullYear()}`
+  );
 
   return runTransaction(invoiceTypeRef, (lastRunNumber) => {
     if (lastRunNumber === null) {
-      return 1;  
+      return 1;
     }
-    return lastRunNumber + 1;  // Increment run number
+    return lastRunNumber + 1; // Increment run number
   })
-  .then((result) => {
-    const runNumber = result.snapshot.val();
-    const invoiceNumber = generateInvoiceNumber(invoiceData.documentType.shortname, runNumber);
+    .then((result) => {
+      const runNumber = result.snapshot.val();
+      const invoiceNumber = generateInvoiceNumber(
+        invoiceData.documentType.shortname,
+        runNumber
+      );
 
-    
-    const newInvoiceRef = push(ref(db, `invoices/${invoiceType}/invoiceList`));
+      const newInvoiceRef = push(
+        ref(db, `invoices/${invoiceType}/invoiceList`)
+      );
 
-    // Save the invoice data with the new run number and invoice number
-    return set(newInvoiceRef, {
-      ...invoiceData,
-      runNumber: runNumber,
-      invoiceNumber: invoiceNumber
+      // Save the invoice data with the new run number and invoice number
+      return set(newInvoiceRef, {
+        ...invoiceData,
+        runNumber: runNumber,
+        invoiceNumber: invoiceNumber,
+      }).then(() => {
+        return newInvoiceRef.key;
+      });
     })
-    .then(() => {
-      return newInvoiceRef.key;  
+    .catch((error) => {
+      console.error("Error saving invoice:", error);
+      throw error;
     });
-  })
-  .catch((error) => {
-    console.error("Error saving invoice:", error);
-    throw error;
-  });
 }
-
-
 
 /* 
 export function getAllInvoices(callback) {
@@ -117,22 +154,24 @@ export function getAllInvoices(callback) {
   );
 } */
 
-  export function getInvoiceById(invoiceType, invoiceId, callback) {
-  
-    const invoiceRef = ref(db, `invoices/${invoiceType}/invoiceList/${invoiceId}`);
-  
-    // Fetch the invoice data
-    get(invoiceRef)
-      .then((snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          callback(data); // Send the data to the caller
-        } else {
-          console.log("No data available for this invoice.");
-          callback(null);
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching data:", error);
-      });
-  }
+export function getInvoiceById(invoiceType, invoiceId, callback) {
+  const invoiceRef = ref(
+    db,
+    `invoices/${invoiceType}/invoiceList/${invoiceId}`
+  );
+
+  // Fetch the invoice data
+  get(invoiceRef)
+    .then((snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        callback(data); // Send the data to the caller
+      } else {
+        console.log("No data available for this invoice.");
+        callback(null);
+      }
+    })
+    .catch((error) => {
+      console.error("Error fetching data:", error);
+    });
+}

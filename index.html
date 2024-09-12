@@ -14,238 +14,304 @@
     <div id="app">
       <v-app>
         <v-container>
-          <!-- Tab Menu -->
-          <v-tabs v-model="activeTab">
-            <v-tab href="#tab-1">สร้างใบเสนอราคา / ใบส่งของ</v-tab>
-            <v-tab href="#tab-2">เพิ่มข้อมูลลูกค้า</v-tab>
-          </v-tabs>
+          <v-form ref="form" lazy-validation>
+            <!-- Tab Menu -->
+            <v-tabs v-model="activeTab">
+              <v-tab href="#tab-1">สร้างใบเสนอราคา / ใบส่งของ</v-tab>
+              <v-tab href="#tab-3">รายการรายงาน</v-tab>
+              <v-tab href="#tab-2">เพิ่มข้อมูลลูกค้า</v-tab>
+            </v-tabs>
 
-          <!-- Tab Content -->
-          <v-tabs-items v-model="activeTab">
-            <!-- Tab 1: สร้างใบเสนอราคา / ใบส่งของ -->
-            <v-tab-item value="tab-1">
-              <v-form>
-                <!-- Dropdown for document type -->
-                <v-select
-                  :items="DocType"
-                  item-text="nameThai"
-                  item-value="id"
-                  label="เลือกประเภทเอกสาร"
-                  v-model="selectedDocId"
-                  @change="populateDoc"
-                ></v-select>
+            <!-- Tab Content -->
+            <v-tabs-items v-model="activeTab">
+              <!-- Tab 1: สร้างใบเสนอราคา / ใบส่งของ -->
+              <v-tab-item value="tab-1">
+                <v-form>
+                  <!-- Dropdown for document type -->
+                  <v-select
+                    :items="DocType"
+                    item-text="nameThai"
+                    item-value="id"
+                    label="เลือกประเภทเอกสาร"
+                    v-model="selectedDocId"
+                    @change="populateDoc"
+                    required
+                  ></v-select>
 
-                <!-- Dropdown for customers -->
-                <v-select
-                  :items="customers"
-                  item-text="name"
-                  item-value="id"
-                  label="เลือกชื่อลูกค้า"
-                  v-model="selectedCustomerId"
-                  @change="populateCustomerDetails"
-                ></v-select>
+                  <!-- Dropdown for customers -->
+                  <v-select
+                    :items="customers"
+                    item-text="name"
+                    item-value="id"
+                    label="เลือกชื่อลูกค้า"
+                    v-model="selectedCustomerId"
+                    @change="populateCustomerDetails"
+                    required
+                  ></v-select>
 
-                <!-- Additional Inputs after customer selection -->
-                <v-row v-if="selectedCustomerId">
-                  <v-col cols="12">
-                    <v-text-field
-                      v-model="selectedCustomer.name"
-                      label="ชื่อบริษัท"
-                      disabled
-                    ></v-text-field>
-                  </v-col>
+                  <!-- Additional Inputs after customer selection -->
+                  <v-row v-if="selectedCustomerId">
+                    <v-col cols="12">
+                      <v-text-field
+                        v-model="selectedCustomer.name"
+                        label="ชื่อบริษัท"
+                        disabled
+                        required
+                      ></v-text-field>
+                    </v-col>
 
-                  <!-- Date Picker -->
-                  <v-col cols="12">
-                    <v-checkbox
-                      v-model="useToday"
-                      label="ใช้วันที่วันนี้"
-                      @change="setCurrentDate"
-                    ></v-checkbox>
+                    <!-- Date Picker -->
+                    <v-col cols="12">
+                      <v-checkbox
+                        v-model="useToday"
+                        label="ใช้วันที่วันนี้ กดที่นี่"
+                        @change="setCurrentDate"
+                      ></v-checkbox>
 
-                    <v-menu
-                      v-model="dateMenu"
-                      :close-on-content-click="false"
-                      transition="scale-transition"
-                      offset-y
-                      min-width="290px"
-                    >
-                      <template v-slot:activator="{ on, attrs }">
-                        <v-text-field
+                      <v-menu
+                        v-model="dateMenu"
+                        :close-on-content-click="false"
+                        transition="scale-transition"
+                        offset-y
+                        min-width="290px"
+                      >
+                        <template v-slot:activator="{ on, attrs }">
+                          <v-text-field
+                            v-model="invoiceDate"
+                            label="วันที่"
+                            readonly
+                            v-bind="attrs"
+                            v-on="on"
+                            :disabled="useToday"
+                            required
+                          ></v-text-field>
+                        </template>
+                        <v-date-picker
                           v-model="invoiceDate"
-                          label="วันที่"
-                          readonly
-                          v-bind="attrs"
-                          v-on="on"
+                          @input="dateMenu = false"
                           :disabled="useToday"
-                        ></v-text-field>
-                      </template>
-                      <v-date-picker
-                        v-model="invoiceDate"
-                        @input="dateMenu = false"
-                        :disabled="useToday"
-                        full-width
-                      ></v-date-picker>
-                    </v-menu>
-                  </v-col>
+                          full-width
+                        ></v-date-picker>
+                      </v-menu>
+                    </v-col>
 
-                  <!-- Items List -->
-                  <v-col cols="12">
-                    <h3>รายการสินค้า</h3>
-                    <v-row v-for="(item, index) in items" :key="index">
-                      <v-col cols="4">
-                        <v-text-field
-                          v-model="item.description"
-                          label="รายการ"
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="2">
-                        <v-text-field
-                          v-model.number="item.quantity"
-                          label="จำนวน"
-                          @input="calculateTotal(index)"
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="3">
-                        <v-text-field
-                          v-model.number="item.unitPrice"
-                          label="ราคาต่อหน่วย"
-                          @input="calculateTotal(index)"
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="2">
-                        <v-text-field
-                          v-model="item.totalPrice"
-                          label="ราคารวม"
-                          disabled
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="1">
-                        <v-btn icon @click="removeItem(index)">
-                          <v-icon>mdi-delete</v-icon>
-                        </v-btn>
-                      </v-col>
-                    </v-row>
-                    <v-btn color="primary" @click="addItem">เพิ่มรายการ</v-btn>
-                  </v-col>
+                    <!-- Items List -->
+                    <v-col cols="12">
+                      <h3>รายการสินค้า</h3>
+                      <v-row v-for="(item, index) in items" :key="index">
+                        <v-col cols="4">
+                          <v-text-field
+                            v-model="item.description"
+                            label="รายการ"
+                            required
+                          ></v-text-field>
+                        </v-col>
+                        <v-col cols="2">
+                          <v-text-field
+                            v-model.number="item.quantity"
+                            label="จำนวน"
+                            @input="calculateTotal(index)"
+                            type="number"
+                            required
+                          ></v-text-field>
+                        </v-col>
+                        <v-col cols="3">
+                          <v-text-field
+                            v-model.number="item.unitPrice"
+                            label="ราคาต่อหน่วย"
+                            @input="calculateTotal(index)"
+                            type="number"
+                            required
+                          ></v-text-field>
+                        </v-col>
+                        <v-col cols="2">
+                          <v-text-field
+                            :value="formatCurrency(item.totalPrice)"
+                            label="ราคารวม"
+                            disabled
+                          ></v-text-field>
+                        </v-col>
+                        <v-col cols="1">
+                          <v-btn icon @click="removeItem(index)">
+                            <v-icon>mdi-delete</v-icon>
+                          </v-btn>
+                        </v-col>
+                      </v-row>
+                      <v-btn color="primary" @click="addItem"
+                        >เพิ่มรายการ</v-btn
+                      >
+                    </v-col>
 
-                  <!-- Discount and credit days -->
-                  <v-col cols="12">
-                    <v-text-field
-                      v-model.number="discount"
-                      label="ส่วนลด (บาท)"
-                    ></v-text-field>
-                    <v-text-field
-                      v-model.number="creditDays"
-                      label="จำนวนวันเครดิต"
-                      :value="creditDays"
-                    ></v-text-field>
-                    <v-text-field
-                      v-model.number="validity"
-                      label="ยืนราคา"
-                      :value="validity"
-                    ></v-text-field>
-                  </v-col>
-                  
-                  <v-container class="pa-4">
-                    <v-row>
-                      <v-col>
-                        <h3>สรุปยอดรวมใบแจ้งหนี้</h3>
-                      </v-col>
-                    </v-row>
-                    <v-row>
-                      <v-col>
-                        <v-simple-table>
-                          <template v-slot:default>
-                            <thead>
-                              <tr>
-                                <th class="text-left">รายละเอียด</th>
-                                <th class="text-right">มูลค่า</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr>
-                                <td><strong>ราคารวม:</strong></td>
-                                <td class="text-right">{{ totalBeforeDiscount.toFixed(2) }} บาท</td>
-                              </tr>
-                              
-                              <tr>
-                                <td><strong>เงินหลังหักส่วนลด:</strong></td>
-                                <td class="text-right">{{ totalAfterDiscount.toFixed(2) }} บาท</td>
-                              </tr>
-                              <tr>
-                                <td><strong>ภาษีมูลค่าเพิ่ม 7%:</strong></td>
-                                <td class="text-right">{{ vat }} บาท</td>
-                              </tr>
-                              <tr>
-                                <td><strong>รวมทั้งหมด:</strong></td>
-                                <td class="text-right">{{ grandTotal }} บาท</td>
-                              </tr>
-                            </tbody>
-                          </template>
-                        </v-simple-table>
-                      </v-col>
-                    </v-row>
-                  </v-container>
+                    <!-- Discount and credit days -->
+                    <v-col cols="12">
+                      <v-text-field
+                        v-model.number="discount"
+                        label="ส่วนลด (บาท)"
+                        type="number"
+                        required
+                      ></v-text-field>
+                      <v-text-field
+                        v-model.number="creditDays"
+                        label="จำนวนวันเครดิต"
+                        type="number"
+                        required
+                      ></v-text-field>
+                      <v-text-field
+                        v-model.number="validity"
+                        label="ยืนราคา"
+                        type="number"
+                        required
+                      ></v-text-field>
+                    </v-col>
 
-                  <!-- Notes -->
-                  <v-col cols="12">
-                    <v-textarea v-model="notes" label="หมายเหตุ"></v-textarea>
-                  </v-col>
+                    <v-container class="pa-4">
+                      <v-row>
+                        <v-col>
+                          <h3>สรุปยอดรวมใบแจ้งหนี้</h3>
+                        </v-col>
+                      </v-row>
+                      <v-row>
+                        <v-col>
+                          <v-simple-table>
+                            <template v-slot:default>
+                              <thead>
+                                <tr>
+                                  <th class="text-left">รายละเอียด</th>
+                                  <th class="text-right">มูลค่า</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td><strong>ราคารวม:</strong></td>
+                                  <td class="text-right">
+                                    {{ formatCurrency(totalBeforeDiscount) }}
+                                    บาท
+                                  </td>
+                                </tr>
 
-                  <!-- Save Button -->
-                  <v-col cols="12">
-                    <v-btn color="success" @click="saveInvoice">
-                      บันทึกใบเสนอราคา/ใบส่งของ
-                    </v-btn>
-                  </v-col>
+                                <tr>
+                                  <td><strong>เงินหลังหักส่วนลด:</strong></td>
+                                  <td class="text-right">
+                                    {{ formatCurrency(totalAfterDiscount) }} บาท
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td><strong>ภาษีมูลค่าเพิ่ม 7%:</strong></td>
+                                  <td class="text-right">
+                                    {{ formatCurrency(vat) }} บาท
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td><strong>รวมทั้งหมด:</strong></td>
+                                  <td class="text-right">
+                                    {{ formatCurrency(grandTotal) }} บาท
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </template>
+                          </v-simple-table>
+                        </v-col>
+                      </v-row>
+                    </v-container>
 
-                  <!-- Print Button (Only show after save) -->
-                  <v-col cols="12" v-if="invoiceSaved">
-                    <v-btn color="info" @click="printInvoice">
-                      พิมพ์ใบเสนอราคา/ใบส่งของ
-                    </v-btn>
-                  </v-col>
-                </v-row>
-              </v-form>
-            </v-tab-item>
+                    <!-- Notes -->
+                    <v-col cols="12">
+                      <v-textarea v-model="notes" label="หมายเหตุ"></v-textarea>
+                    </v-col>
 
-            <!-- Tab 2: เพิ่มข้อมูลลูกค้า -->
-            <v-tab-item value="tab-2">
-              <v-form>
-                <h2>เพิ่มข้อมูลลูกค้า</h2>
-                <v-row>
-                  <v-col cols="12">
-                    <v-text-field
-                      v-model="newCustomer.name"
-                      label="ชื่อบริษัท"
-                    ></v-text-field>
-                  </v-col>
-                  <v-col cols="12">
-                    <v-text-field
-                      v-model="newCustomer.taxId"
-                      label="เลขประจำตัวผู้เสียภาษี"
-                    ></v-text-field>
-                  </v-col>
-                  <v-col cols="12">
-                    <v-text-field
-                      v-model="newCustomer.phone"
-                      label="เบอร์โทรศัพท์"
-                    ></v-text-field>
-                  </v-col>
-                  <v-col cols="12">
-                    <v-textarea
-                      v-model="newCustomer.address"
-                      label="ที่อยู่"
-                    ></v-textarea>
-                  </v-col>
-                </v-row>
-                <v-btn color="primary" @click="addCustomer">
-                  เพิ่มข้อมูลลูกค้า
-                </v-btn>
-              </v-form>
-            </v-tab-item>
-          </v-tabs-items>
+                    <!-- Save Button -->
+                    <v-col cols="6">
+                      <v-btn
+                        color="success"
+                        :disabled="isSaveButtonDisabled"
+                        @click="saveInvoice"
+                      >
+                        บันทึกใบเสนอราคา/ใบส่งของ
+                      </v-btn>
+                    </v-col>
+
+                    <!-- Print Button (Only show after save) -->
+                    <v-col cols="6" v-if="invoiceSaved">
+                      <v-btn color="info" @click="printInvoice">
+                        พิมพ์ใบเสนอราคา/ใบส่งของ
+                      </v-btn>
+                    </v-col>
+                  </v-row>
+                </v-form>
+              </v-tab-item>
+
+              <!-- Tab 2: เพิ่มข้อมูลลูกค้า -->
+              <v-tab-item value="tab-2">
+                <v-form>
+                  <h2>เพิ่มข้อมูลลูกค้า</h2>
+                  <v-row>
+                    <v-col cols="12">
+                      <v-text-field
+                        v-model="newCustomer.name"
+                        label="ชื่อบริษัท"
+                        required
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="12">
+                      <v-text-field
+                        v-model="newCustomer.taxId"
+                        label="เลขประจำตัวผู้เสียภาษี"
+                        required
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="12">
+                      <v-text-field
+                        v-model="newCustomer.phone"
+                        label="เบอร์โทรศัพท์"
+                        required
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="12">
+                      <v-textarea
+                        v-model="newCustomer.address"
+                        label="ที่อยู่"
+                        required
+                      ></v-textarea>
+                    </v-col>
+                  </v-row>
+                  <v-btn color="primary" @click="addCustomer">
+                    เพิ่มข้อมูลลูกค้า
+                  </v-btn>
+                </v-form>
+              </v-tab-item>
+
+              <!-- Tab 3: รายการรายงาน -->
+              <v-tab-item value="tab-3">
+                <v-data-table
+                  :headers="headers"
+                  :items="invoiceData"
+                  :search="search"
+                  item-value="id"
+                  class="elevation-1"
+                >
+                  <template v-slot:top>
+                    <v-toolbar flat>
+                      <v-toolbar-title>Invoices</v-toolbar-title>
+                      <v-divider class="mx-4" inset vertical></v-divider>
+                      <v-spacer></v-spacer>
+                      <v-text-field
+                        v-model="search"
+                        label="Search"
+                        single-line
+                        hide-details
+                      ></v-text-field>
+                    </v-toolbar>
+                  </template>
+
+                  <template v-slot:item.actions="{ item }">
+                    <v-btn color="primary" @click="viewInvoice(item)"
+                      >View</v-btn
+                    >
+                  </template>
+                </v-data-table>
+              </v-tab-item>
+            </v-tabs-items>
+          </v-form>
         </v-container>
       </v-app>
     </div>
@@ -261,6 +327,7 @@
         addCustomerToFirebase,
         getCustomerData,
         saveInvoiceToFirebase,
+        getInvoiceData,
       } from "./firebase.js";
 
       new Vue({
@@ -306,6 +373,17 @@
           validity: 30,
           notes: "",
           invoiceSaved: false,
+          isSaveButtonDisabled: true,
+          search: "",
+          headers: [
+            { text: "Invoice ID", value: "invoiceNumber" },
+            { text: "Date", value: "date" },
+            { text: "Customer", value: "customer.name" },
+            { text: "Document Type", value: "documentType" },
+            { text: "เงินรวม", value: "grandTotal" },
+            { text: "Actions", value: "actions", sortable: false },
+          ],
+          invoiceData: [],
         },
         computed: {
           totalBeforeDiscount() {
@@ -319,17 +397,29 @@
             return this.totalBeforeDiscount - this.discount;
           },
           vat() {
-            // คำนวณภาษีมูลค่าเพิ่ม 7% และให้แสดงทศนิยม 2 ตำแหน่ง
-            return (this.totalAfterDiscount * this.vatRate).toFixed(2);
+            // คำนวณภาษีมูลค่าเพิ่ม 7% (ให้คืนค่าเป็นตัวเลข)
+            return parseFloat(
+              (this.totalAfterDiscount * this.vatRate).toFixed(2)
+            );
           },
           grandTotal() {
-            // คำนวณรวมทั้งหมดหลังบวกภาษีมูลค่าเพิ่ม
-            return (
-              parseFloat(this.totalAfterDiscount) + parseFloat(this.vat)
-            ).toFixed(2);
+            // คำนวณรวมทั้งหมดหลังบวกภาษีมูลค่าเพิ่ม (คืนค่าเป็นตัวเลข)
+            return parseFloat(
+              (
+                parseFloat(this.totalAfterDiscount) + parseFloat(this.vat)
+              ).toFixed(2)
+            );
+          },
+        },
+        watch: {
+          grandTotal(newVal) {
+            this.isSaveButtonDisabled = newVal >= 0 ? false : true;
           },
         },
         methods: {
+          formatCurrency(value) {
+            return new Intl.NumberFormat("th-TH").format(value);
+          },
           addCustomer() {
             addCustomerToFirebase(this.newCustomer)
               .then(() => {
@@ -355,6 +445,24 @@
                   }))
                 : [];
             });
+          },
+          getInvoice() {
+            getInvoiceData((invoices) => {
+              if (invoices) {
+                this.invoiceData = invoices;
+              } else {
+                console.log("No invoices found.");
+              }
+            });
+          },
+          viewInvoice(invoice) {
+            const invoiceDataEncoded = encodeURIComponent(
+              JSON.stringify({
+                id: invoice.id,
+                type: invoice.documentType, // ส่งประเภทเอกสารด้วย (เช่น 'Billing Note', 'Delivery Note')
+              })
+            );
+            window.open(`invoice.html?data=${invoiceDataEncoded}`, "_blank");
           },
           populateCustomerDetails() {
             const customer = this.customers.find(
@@ -390,31 +498,7 @@
             item.totalPrice = item.quantity * item.unitPrice;
           },
 
-          calculateInvoiceTotals() {
-            // คำนวณราคารวมทั้งหมด (ไม่รวมส่วนลด)
-            this.totalBeforeDiscount = this.items.reduce((total, item) => {
-              return total + (item.totalPrice || 0);
-            }, 0);
-
-            // ใช้ส่วนลดแบบจำนวนเงิน (บาท)
-            const discountAmount = this.discount;
-
-            // คำนวณเงินหลังหักส่วนลด
-            this.totalAfterDiscount = this.totalBeforeDiscount - discountAmount;
-
-            // คำนวณภาษีมูลค่าเพิ่ม 7% และเก็บทศนิยม 2 ตำแหน่ง
-            this.vat = (this.totalAfterDiscount * this.vatRate).toFixed(2);
-
-            // รวมทั้งหมดหลังบวกภาษีมูลค่าเพิ่ม
-            this.grandTotal = (
-              parseFloat(this.totalAfterDiscount) + parseFloat(this.vat)
-            ).toFixed(2);
-          },
-
           saveInvoice() {
-            // เรียกใช้ฟังก์ชันคำนวณก่อนบันทึก
-            this.calculateInvoiceTotals();
-
             const invoiceData = {
               documentType: this.selectedDoc,
               customer: this.selectedCustomer,
@@ -433,7 +517,7 @@
             saveInvoiceToFirebase(invoiceData, this.selectedDoc.nameEng)
               .then((data) => {
                 this.invoiceSaved = data;
-                console.log("Invoice saved successfully with ID:", data);
+                // console.log("Invoice saved successfully with ID:", data);
               })
               .catch((error) => {
                 console.error("Error saving invoice:", error);
@@ -461,6 +545,7 @@
         },
         mounted() {
           this.getCustomer();
+          this.getInvoice();
         },
       });
     </script>
